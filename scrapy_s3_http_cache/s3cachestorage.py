@@ -1,3 +1,4 @@
+import threading
 import boto3
 import gzip
 import json
@@ -6,6 +7,7 @@ import os
 import subprocess
 from botocore.exceptions import ClientError
 from botocore.stub import Stubber
+from collections import deque
 from contextlib import suppress
 from time import time
 from datetime import datetime
@@ -39,7 +41,14 @@ def configure_log_level(level):
                 logging.getLogger(name).setLevel(level)
 
 
-class S3CacheStorage(object):
+class S3CachedFile(object):
+    def __init__(self, obj, bucket, key):
+        self.obj = obj
+        self.bucket = bucket
+        self.key = key
+
+
+class S3CacheStorage(threading.Thread):
     """ S3 storage backend for Scrapy's HTTP cache middleware
 
         Settings:
@@ -61,7 +70,10 @@ class S3CacheStorage(object):
 
     """
 
+    _upload_buffer = deque()
+
     def __init__(self, settings):
+        super(S3CacheStorage, self).__init__()
         urifmt = settings.get('S3CACHE_URI', '')
         if not urifmt:
             raise NotConfigured('S3CACHE_URI must be specified')
@@ -94,6 +106,9 @@ class S3CacheStorage(object):
 
         # Configure log level for all modules related do s3 access
         configure_log_level(logging.INFO)
+
+        # Start with the thread disabled
+        self._run = False
 
     @property
     def _client_stubber(self):
@@ -131,9 +146,25 @@ class S3CacheStorage(object):
             raise NotConfigured('Could not get spider! Aborting...')
         return self._spider
 
+    def run(self):
+        """ This method runs in a separated thread which uploads files to s3 """
+
+        while self._run or len(self._upload_buffer):
+            with suppress(IndexError):
+                cached_file = self._upload_buffer.popleft()
+                self.put_object_to_key(cached_file.obj, cached_file.bucket, cached_file.key)
+
+    def enqueue_to_upload(self, obj, bucket, key):
+        # Enable the thread
+        if not self._run:
+            self._run = True
+            self.start()
+        self._upload_buffer.append(S3CachedFile(obj, bucket, key))
+
     def put_object_to_key(self, obj, bucket, key):
         try:
             obj = gzip.compress(obj) if self.use_gzip else obj
+            logger.debug(f'Storing cached response on {bucket}/{key}')
             self.client.put_object(Body=obj, Bucket=bucket, Key=key)
         except ClientError as e:
             logger.warning('Failed to store cache on key {key}: {e}'.format(key=key, e=e))
@@ -153,6 +184,8 @@ class S3CacheStorage(object):
         self._spider = spider
 
     def close_spider(self, spider):
+        self._run = False
+        self.join()
         logger.info(
             'Cache on s3 bucket {bucket} on key path {keypath}'.format(bucket=self.bucket_name, keypath=self.keypath),
             extra={'spider': spider}
@@ -195,7 +228,7 @@ class S3CacheStorage(object):
             'request_headers': headers_dict_to_raw(request.headers),
             'request_body': request.body
         }
-        self.put_object_to_key(pickle.dumps(keydata), self.bucket_name, keyname)
+        self.enqueue_to_upload(pickle.dumps(keydata), self.bucket_name, keyname)
 
     def _get_request_path(self, request):
         key = request_fingerprint(request)
