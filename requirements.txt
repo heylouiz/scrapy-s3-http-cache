@@ -1,0 +1,5 @@
+boto3==1.9.120
+flake8==3.7.7
+Scrapy==1.6.0
+pytest
+pytest-cov
