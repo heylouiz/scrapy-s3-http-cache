@@ -136,7 +136,7 @@ class S3CacheStorage(object):
             obj = gzip.compress(obj) if self.use_gzip else obj
             self.client.put_object(Body=obj, Bucket=bucket, Key=key)
         except ClientError as e:
-            logger.warning(f'Failed to store cache on key {key}: {e}')
+            logger.warning('Failed to store cache on key {key}: {e}'.format(key=key, e=e))
 
     def get_object_from_key(self, bucket, key):
         try:
@@ -144,7 +144,7 @@ class S3CacheStorage(object):
             obj = response['Body'].read()
             return gzip.decompress(obj) if self.use_gzip else obj
         except ClientError as e:
-            logger.warning(f'Failed to retrieve cache on key {key}: {e}')
+            logger.warning('Failed to retrieve cache on key {key}: {e}'.format(key=key, e=e))
 
     def open_spider(self, spider):
         logger.debug('Using s3 cache storage in %(bucket_name)s' % {'bucket_name': self.bucket_name},
@@ -154,7 +154,7 @@ class S3CacheStorage(object):
 
     def close_spider(self, spider):
         logger.info(
-            f'Cache on s3 bucket {self.bucket_name} on key path {self.keypath}',
+            'Cache on s3 bucket {bucket} on key path {keypath}'.format(bucket=self.bucket_name, keypath=self.keypath),
             extra={'spider': spider}
         )
 
@@ -199,4 +199,4 @@ class S3CacheStorage(object):
 
     def _get_request_path(self, request):
         key = request_fingerprint(request)
-        return f'{self.keypath}/{key}'
+        return '{keypath}/{key}'.format(keypath=self.keypath, key=key)

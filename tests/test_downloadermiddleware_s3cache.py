@@ -226,14 +226,14 @@ class S3CacheStorageTest(unittest.TestCase):
             'S3CACHE_URI': 's3://aws_access_key:aws_secret_key@bucketname/%(name)s/%(name)s-%(time)s.zip'
         }
         with self._storage(**settings) as storage:
-            keypath_regex = f'{self.spider_name}/{self.spider_name}-'
+            keypath_regex = '{spider_name}/{spider_name}-'.format(spider_name=self.spider_name)
             date_regex = r'\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}'
             keypath_regex = keypath_regex + date_regex
             assert re.match(keypath_regex, storage.keypath) is not None
 
         keypath = '1234567'
         settings = {
-            'S3CACHE_URI': f's3://bucketname/{keypath}'
+            'S3CACHE_URI': 's3://bucketname/{keypath}'.format(keypath=keypath)
         }
         with self._storage(**settings) as storage:
             assert keypath == storage.keypath
