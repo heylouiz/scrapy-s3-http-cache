@@ -40,14 +40,14 @@ def configure_log_level(level):
 
 
 class S3CacheStorage(object):
-    """ When enabled and configured as the HTTPCACHE_STORAGE, S3CacheStorage will use a s3 bucket as cache.
+    """ S3 storage backend for Scrapy's HTTP cache middleware
 
-        Settings
+        Settings:
 
         The settings below can be defined as any other Scrapy settings, as described on Scrapy docs.
 
-        S3CACHE_URI: the URI where the file should be stored.
-        S3CACHE_BUCKET: the bucket where the file should be stored.
+        S3CACHE_URI: the URI where the cache should be stored.
+           Eg: 's3://aws_key:aws_secret@bucket/%(name)s-%(time)s'
         S3CACHE_DONT_RETRIEVE: Do not retrieve responses from the cache, only for storage. Default: False.
 
         This extension relies on Scrapy cache mechanism, which should be enabled and configured.
